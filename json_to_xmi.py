@@ -41,12 +41,6 @@ class JsonToXmiConverter:
         root_project = JsonToXmiConverter._create_project(json_data)
         tree.projects.append(root_project)
 
-        # Process children
-        if 'children' in json_data:
-            for child in json_data['children']:
-                child_project = JsonToXmiConverter._create_project(child)
-                tree.projects.append(child_project)
-
         forest.dependency_trees.append(tree)
 
         # Convert to XMI
@@ -76,19 +70,37 @@ class JsonToXmiConverter:
         # Create XMI root
         root = ET.Element('xmi:XMI', {
             'xmlns:xmi': 'http://www.omg.org/XMI',
-            'xmlns:dp': 'geodes.sms.dependency'
+            'xmlns:dp': 'geodes.sms.dependencies'
         })
 
-        # Create DependencyForest
         forest_elem = ET.SubElement(root, 'dp:DependencyForest')
 
-        # Create DependencyTree
+        def add_project_dependencies(project_element, project):
+            for dep in project.dependencies:
+                dep_elem = ET.SubElement(project_element, 'dependencies')
+                dep_elem.set('xmi:type', 'dp:Dependency')
+                dep_elem.set('name', dep.name)
+
+                # for method in dep.methods:
+                #     method_elem = ET.SubElement(dep_elem, 'methods')
+                #     method_elem.text = method
+
+                if dep.dep_project:
+                    for dependency_project in dep.dep_project:
+                        dep_project_elem = ET.SubElement(dep_elem, 'depProject')
+                        dep_project_elem.set('xmi:type', 'dp:Project')
+                        dep_project_elem.set('name', dependency_project.name)
+                        dep_project_elem.set('groupId', dependency_project.group_id)
+                        dep_project_elem.set('artifactId', dependency_project.artifact_id)
+                        dep_project_elem.set('version', dependency_project.version)
+
+                        add_project_dependencies(dep_project_elem, dependency_project)
+
         for tree in forest.dependency_trees:
             tree_elem = ET.SubElement(forest_elem, 'dependencyTrees')
             tree_elem.set('xmi:type', 'dp:DependencyTree')
             tree_elem.set('name', tree.name)
 
-            # Create Projects
             for project in tree.projects:
                 proj_elem = ET.SubElement(tree_elem, 'projects')
                 proj_elem.set('xmi:type', 'dp:Project')
@@ -97,10 +109,7 @@ class JsonToXmiConverter:
                 proj_elem.set('artifactId', project.artifact_id)
                 proj_elem.set('version', project.version)
 
-                # Create Dependencies
-                for dep in project.dependencies:
-                    dep_elem = ET.SubElement(proj_elem, 'dependencies')
-                    dep_elem.set('xmi:type', 'dp:Dependency')
-                    dep_elem.set('name', dep.name)
+                add_project_dependencies(proj_elem, project)
 
         return ET.tostring(root, encoding='unicode')
+

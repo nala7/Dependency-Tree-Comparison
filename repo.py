@@ -32,6 +32,7 @@ class Repo:
 
         response = requests.get(self.api_url, headers=self.headers)
         if response.status_code == 200:
+            print(f"Cloning {self.api_url}...")
             contents = response.json()
             for item in contents:
                 if item['type'] == 'file' and item['name'] == 'pom.xml':
@@ -39,11 +40,11 @@ class Repo:
                     self.config_file = self._fetch_file_content(item['url'])
                     if not os.path.exists(self.local_repo_dir):
                         subprocess.run(["git", "clone", self.url_path, self.local_repo_dir], check=True)
-                    print(f"{self.name}'s pom.xml file fetched")
                 elif item['type'] == 'file' and item['name'] == 'build.gradle':
-                    # self.is_gradle = True
-                    # self.config_file = self.fetch_file_content(item['url'])
-                    raise Exception(f"Currently project doesn't admit Gradle projects")
+                    self.is_gradle = True
+                    self.config_file = self._fetch_file_content(item['url'])
+                    if not os.path.exists(self.local_repo_dir):
+                        subprocess.run(["git", "clone", self.url_path, self.local_repo_dir], check=True)
         else:
             raise Exception(f"Failed to fetch repository contents. Status Code: {response.status_code}")
 
