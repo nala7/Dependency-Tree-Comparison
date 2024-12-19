@@ -4,34 +4,41 @@ from repo import Repo
 from json_to_xmi import JsonToXmiConverter
 from pom_xml_to_json import pom_xml_to_json, generate_dot_graph
 from compare_xmi_trees import parse_xmi, find_common_projects
+from gradle_to_json import generate_json_from_gradle
 
 separator_string = "-------------------------------"
 
 def convert_dependency_json_from_repo(project_name: str, repo: Repo):
     print(separator_string)
-    print("Converting pom.xml file to JSON...")
-    json_path = pom_xml_to_json(project_name, repo.config_file, repo.local_repo_dir)
-    print(f"{project_name} JSON created in {json_path}")
+    if repo.is_pom:
+        print("Converting pom.xml file to JSON...")
+        json_path = pom_xml_to_json(project_name, repo.config_file, repo.local_repo_dir)
+        print(f"{project_name} JSON created in {json_path}")
+
+    if repo.is_gradle:
+        print("Converting gradle file to JSON...")
+        json_path = generate_json_from_gradle(project_name, repo.config_file, repo.local_repo_dir)
+
     print(separator_string)
     return json_path
 
 
-def convert_dependency_json(project_name: str, project_path: str):
-    print(separator_string)
-    pom_file_path = os.path.join(project_path, "pom.xml")
-
-    if not os.path.exists(pom_file_path):
-        raise FileNotFoundError(f"pom.xml not found in the specified project path: {project_path}")
-
-    # Read the content of the pom.xml file
-    with open(pom_file_path, 'r', encoding='utf-8') as file:
-        pom_file = file.read()
-
-    print("Converting pom.xml file to JSON...")
-    json_path = pom_xml_to_json(project_name, pom_file, project_path)
-    print(f"{project_name} JSON created in {json_path}")
-    print(separator_string)
-    return json_path
+# def convert_dependency_json(project_name: str, project_path: str):
+#     print(separator_string)
+#     pom_file_path = os.path.join(project_path, "pom.xml")
+#
+#     if not os.path.exists(pom_file_path):
+#         raise FileNotFoundError(f"pom.xml not found in the specified project path: {project_path}")
+#
+#     # Read the content of the pom.xml file
+#     with open(pom_file_path, 'r', encoding='utf-8') as file:
+#         pom_file = file.read()
+#
+#     print("Converting pom.xml file to JSON...")
+#     json_path = pom_xml_to_json(project_name, pom_file, project_path)
+#     print(f"{project_name} JSON created in {json_path}")
+#     print(separator_string)
+#     return json_path
 
 
 def convert_json_dependency_to_xmi(repo_name: str, dependency_json_path: str):
@@ -82,25 +89,35 @@ def compare_trees(path_xmi1, path_xmi2):
         print(f"File not found: {e.filename}")
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+
+
+def create_xmi_from_url(repo_name: str, url: str):
+    repo = Repo(repo_name, url, github_token)
+    json_path = convert_dependency_json_from_repo(repo_name, repo)
+    xmi_path = convert_json_dependency_to_xmi(repo_name, json_path)
+    return repo, json_path, xmi_path
+
 # project_path = "/Users/macbookpro/PycharmProjects/Dependency-Tree-Comparison/depgraph-maven-plugin-test"
 # json_path = convert_dependency_json("Test", project_path)
 # convert_json_dependency_to_xmi("Test", json_path)
 
 github_token = "1234"
 
-repo_url = "https://github.com/graphhopper/graphhopper"
-repo_name = "graphhopper"
-repo = Repo(repo_name, repo_url, github_token)
-repo.print_status()
-json_path = convert_dependency_json_from_repo(repo_name, repo)
-graphhopper_xmi = convert_json_dependency_to_xmi(repo_name, json_path)
-generate_dot_graph(repo)
+# repo_url = "https://github.com/graphhopper/graphhopper"
+# repo_name = "graphhopper"
+# repo = Repo(repo_name, repo_url, github_token)
+# repo.print_status()
+# json_path = convert_dependency_json_from_repo(repo_name, repo)
+# graphhopper_xmi = convert_json_dependency_to_xmi(repo_name, json_path)
+# generate_dot_graph(repo)
+
+
+besu_repo, besu_json_path, besu_xmi = create_xmi_from_url("besu", "https://github.com/hyperledger/besu")
+teku_repo, teku_json, teku_xmi = create_xmi_from_url("teku", "https://github.com/Consensys/teku")
 
 
 
-
-
-compare_trees(graphhopper_xmi)
+compare_trees(teku_xmi, besu_xmi)
 
 
 # test_url = "https://github.com/ferstl/depgraph-maven-plugin/"

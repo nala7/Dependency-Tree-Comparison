@@ -52,26 +52,29 @@ def buildDependencyTree(dependency) {
 
 
 def append_to_build_gradle(file_path, script):
+    local_gradle_path = os.path.join(file_path, 'build.gradle')
+
     try:
-        with open(file_path, "a") as file:
+        with open(local_gradle_path, "a") as file:
             file.write("\n" + script.strip() + "\n")
-        print(f"Groovy script successfully appended to {file_path}")
+        print(f"Groovy script successfully appended to {local_gradle_path}")
     except FileNotFoundError:
-        print(f"Error: {file_path} not found. Please ensure the file exists.")
+        print(f"Error: {local_gradle_path} not found. Please ensure the file exists.")
 
 
-def run_gradle_task():
+def run_gradle_task(file_path):
     print("Running Gradle task to generate dependency-hierarchy.json...")
     try:
-        subprocess.run(["./gradlew", "generateDependencyHierarchyJson"], check=True)
+        os.chdir(file_path)
+        subprocess.run(["./gradlew", "buildDependencyTree"], check=True)
         print("Gradle task completed successfully!")
     except subprocess.CalledProcessError:
         print("Error running Gradle task. Please check your build.gradle file.")
         exit(1)
 
 
-def find_dependency_json(build_dir="build"):
-    json_path = os.path.join(build_dir, "dependency-hierarchy.json")
+def find_dependency_json(file_path):
+    json_path = os.path.join(file_path, "dependency-hierarchy.json")
     if os.path.exists(json_path):
         print(f"JSON file found at: {json_path}")
         return json_path
@@ -87,14 +90,9 @@ def read_json(json_path):
         print(json.dumps(data, indent=4))
 
 
-def generate_json_from_gradle():
-    if os.path.exists(build_gradle_path):
-        append_to_build_gradle(build_gradle_path, gradle_script)
-        print("Script added to build gradle file")
-    else:
-        print(f"{build_gradle_path} does not exist in the current directory.")
-
-    run_gradle_task()
-    json_path = find_dependency_json()
+def generate_json_from_gradle(project_name, gradle_file, file_path):
+    append_to_build_gradle(file_path, gradle_script)
+    run_gradle_task(file_path)
+    json_path = find_dependency_json(file_path)
     read_json(json_path)
     return json_path
