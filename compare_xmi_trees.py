@@ -1,58 +1,42 @@
-from lxml import etree
 import xml.etree.ElementTree as ET
 
 
-def parse_dependency(element, namespace):
-    project = {
-        "name": element.attrib.get("name"),
-        "groupId": element.attrib.get("groupId"),
-        "artifactId": element.attrib.get("artifactId"),
-        "version": element.attrib.get("version"),
-        "dependencies": []
-    }
-    for dependency in element.findall(".//dp:dependencies", namespace):
-        dep_project = dependency.find("dp:Project", namespace)
-        if dep_project is not None:
-            project["dependencies"].append(parse_dependency(dep_project, namespace))
-    return project
+def parse_xmi_projects(xmi_content):
+    root = ET.fromstring(xmi_content)
+    project_list = []
+    project_set = set()
 
-def parse_xmi(xmi_data):
-    root = ET.fromstring(xmi_data)
-    namespace = {'xmi': 'http://www.omg.org/XMI', 'dp': 'geodes.sms.dependencies'}
-    root_project = root.find(".//dp:Project", namespace)
-    parsed_project = parse_dependency(root_project, namespace)
-    return parsed_project
+    for project_elem in root.findall(".//depProject"):
+        group_id = project_elem.get('groupId', '')
+        artifact_id = project_elem.get('artifactId', '')
+        # version = project_elem.get('version', '')
+        project_list.append((group_id, artifact_id))
+        project_set.add((group_id, artifact_id))
 
-    # tree = etree.parse(xmi_data)
-    # root = tree.getroot()
-    #
-    # # namespaces = {'dp': 'geodes.sms.dependencies'}
-    # namespaces = {'xmi': 'http://www.omg.org/XMI', 'dp': 'geodes.sms.dependencies'}
-    #
-    # # Debugging: Print the root element and its children
-    # projects = []
-    # for elem in root.iter():
-    #     if elem.tag == 'depProject':
-    #         group_id = elem.get("groupId")
-    #         artifact_id = elem.get("artifactId")
-    #         version = elem.get("version")
-    #         name = elem.get("name", "Unnamed Project")
-    #
-    #         projects.append({
-    #             "name": name,
-    #             "groupId": group_id,
-    #             "artifactId": artifact_id,
-    #             "version": version
-    #         })
-    # return projects
+    return project_list, project_set
 
-def find_common_projects(projects1, projects2):
-    common_projects = []
-    projects1_set = {(p["groupId"], p["artifactId"], p["version"]) for p in projects1}
 
-    for p2 in projects2:
-        key = (p2["groupId"], p2["artifactId"], p2["version"])
-        if key in projects1_set:
-            common_projects.append(p2["name"])
+def compare_xmi_files(project_name1, xmi_content1, project_name2, xmi_content2):
+    project_list1, project_set1 = parse_xmi_projects(xmi_content1)
+    project_list2, project_set2 = parse_xmi_projects(xmi_content2)
 
-    return common_projects
+    # Find common projects
+    print(f"{project_name1} total dependencies: {len(project_list1)}")
+    print(f"{project_name2} total dependencies: {len(project_list2)}")
+    print('------')
+    print(f"{project_name1} set of dependencies: {len(project_set1)}")
+    print(f"{project_name2} set of dependencies: {len(project_set2)}")
+    print('------')
+
+    common_projects = project_set1.intersection(project_set2)
+    print(f"Common projects: {len(common_projects)}")
+    for name in common_projects:
+        print(name)
+    return len(common_projects), common_projects
+
+def compare_trees(project_name1, xmi_file_path1, project_name2, xmi_file_path2):
+    with open(xmi_file_path1, 'r', encoding='utf-8') as file1, open(xmi_file_path2, 'r', encoding='utf-8') as file2:
+        xmi_content1 = file1.read()
+        xmi_content2 = file2.read()
+        common_count, common_projects = compare_xmi_files(project_name1, xmi_content1, project_name2, xmi_content2)
+        return  common_count, common_projects

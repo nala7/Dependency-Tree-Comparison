@@ -26,7 +26,7 @@ class Repo:
 
         self._clone_repo()
 
-    def _clone_repo(self):
+    def _clone_repo(self, date = None):
         if not self.api_url:
             raise ValueError("API URL is not set. Ensure the repository URL is valid.")
 
@@ -55,6 +55,21 @@ class Repo:
             if content:
                 return base64.b64decode(content).decode('utf-8')
         raise Exception(f"Failed to fetch file content. Status Code: {response.status_code}")
+
+    def change_repo_date(self, date):
+        os.chdir(self.local_repo_dir)
+        try:
+            commit_hash = subprocess.check_output(
+                ["git", "rev-list", "-n", "1", "--before", date, "HEAD"]
+            ).strip().decode("utf-8")
+
+            subprocess.run(["git", "checkout", commit_hash], check=True)
+            print(f"Repository checked out to commit {commit_hash} from {date}.")
+        except subprocess.CalledProcessError as e:
+            print(f"Error while changing repository date: {e}")
+            raise
+        finally:
+            os.chdir("..")
 
     def print_status(self):
         print(f"Repository: {self.name}")

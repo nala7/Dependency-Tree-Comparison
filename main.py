@@ -3,7 +3,7 @@ import os
 from repo import Repo
 from json_to_xmi import JsonToXmiConverter
 from pom_xml_to_json import pom_xml_to_json, generate_dot_graph
-from compare_xmi_trees import parse_xmi, find_common_projects
+from compare_xmi_trees import compare_trees
 # from gradle_to_json import gradle_to_json
 from parse_gradle_dependencies import gradle_to_json
 
@@ -52,44 +52,37 @@ def convert_json_dependency_to_xmi(repo_name: str, dependency_json_path: str, fi
     return dependency_xmi_path
 
 
-def compare_trees(repo_path_1, path_xmi_1, repo_path_2, path_xmi_2):
+def compare(repo1: Repo, path_xmi_1, repo2: Repo, path_xmi_2):
     print(separator_string)
     print("Comparing trees...")
-    try:
-        model1 = os.path.join(repo_path_1, path_xmi_1)
-        with open(model1, 'r', encoding='utf-8') as file1:
-            content1 = file1.read()
 
-        model2 = os.path.join(repo_path_2, path_xmi_2)
-        with open(model2, 'r', encoding='utf-8') as file2:
-            content2 = file2.read()
-
-        # Parse both XMI contents
-        projects1 = parse_xmi(content1)
-        projects2 = parse_xmi(content2)
-        print("XMIs parsed")
-        print("Finding common dependencies...")
-        # Find and print common projects
-        common = find_common_projects(projects1, projects2)
-        print(f"Number of common projects: {len(common)}")
-        # print("Common project names:")
-        # for name in common:
-        #     print(name)
-        print(separator_string)
-    except FileNotFoundError as e:
-        print(f"File not found: {e.filename}")
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
+    model1 = os.path.join(repo1.local_repo_dir, path_xmi_1)
+    model2 = os.path.join(repo2.local_repo_dir, path_xmi_2)
+    common_count, common_projects = compare_trees(repo1.name, model1, repo2.name, model2)
+    print(f"Number of common projects: {common_count}")
+    # print("Common project names:")
+    # for name in common_projects:
+    #     print(name)
+    print(separator_string)
 
 
 
 
 def create_xmi_from_url(repo_name: str, url: str):
+    dates = ["12/2023", "12/2024"]
     repo = Repo(repo_name, url, github_token)
-    json_path = convert_dependency_json_from_repo(repo_name, repo)
-    xmi_path = convert_json_dependency_to_xmi(repo_name, json_path, repo.local_repo_dir)
-    return repo, json_path, xmi_path
+    json_list = []
+    xmi_list = []
+    for date in dates:
+        print("Changing date")
+        # repo.change_repo_date(date)
+        print("Date changed")
+        json_path = convert_dependency_json_from_repo(repo_name, repo)
+        json_list.append(json_path)
+        xmi_list.append(convert_json_dependency_to_xmi(repo_name, json_path, repo.local_repo_dir))
 
+
+    return repo, json_list, xmi_list
 # project_path = "/Users/macbookpro/PycharmProjects/Dependency-Tree-Comparison/depgraph-maven-plugin-test"
 # json_path = convert_dependency_json("Test", project_path)
 # convert_json_dependency_to_xmi("Test", json_path)
@@ -107,10 +100,11 @@ github_token = "1234"
 
 
 
-besu_repo, besu_json_path, besu_xmi = create_xmi_from_url("besu", "https://github.com/hyperledger/besu")
-teku_repo, teku_json, teku_xmi = create_xmi_from_url("teku", "https://github.com/Consensys/teku")
+teku_repo, teku_json_list, teku_xmi_list = create_xmi_from_url("teku", "https://github.com/Consensys/teku")
+besu_repo, besu_json_list, besu_xmi_list = create_xmi_from_url("besu", "https://github.com/hyperledger/besu")
 
-compare_trees(teku_repo.local_repo_dir, teku_xmi, besu_repo.local_repo_dir, besu_xmi)
+for i in range(len(besu_xmi_list)):
+    compare(teku_repo, teku_xmi_list[i], besu_repo, besu_xmi_list[i])
 
 
 # test_url = "https://github.com/ferstl/depgraph-maven-plugin/"
