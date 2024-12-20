@@ -1,98 +1,46 @@
-import os
-import subprocess
 import json
+import re
 
+def parse_dependencies(lines, level=0):
+    result = []
+    while lines:
+        line = lines[0]
+        current_level = len(re.match(r"(\s*)", line).group(1)) // 4
+        if current_level < level:
+            break
+        if current_level > level:
+            children = parse_dependencies(lines, level + 1)
+            if result:
+                result[-1]["children"].extend(children)
+            continue
+        lines.pop(0)
+        match = re.match(r"\s*\+--- ([^:]+):([^:]+):([^ ]+)", line)
+        if not match:
+            match = re.match(r"\s*\\--- ([^:]+):([^:]+):([^ ]+)", line)
+        if match:
+            group_id, artifact_id, version = match.groups()
+            result.append({
+                "groupId": group_id,
+                "artifactId": artifact_id,
+                "version": version,
+                "children": []
+            })
+    return result
 
-build_gradle_path = "build.gradle"
-
-gradle_script = """
-import groovy.json.JsonBuilder
-
-task generateDependencyHierarchyJson {
-    doLast {
-        def rootDependencies = [:]
-
-        configurations.findAll { it.isCanBeResolved() }.each { configuration ->
-            try {
-                def configDependencies = []
-
-                configuration.resolvedConfiguration.firstLevelModuleDependencies.each { dependency ->
-                    configDependencies << buildDependencyTree(dependency)
-                }
-
-                if (!configDependencies.isEmpty()) {
-                    rootDependencies[configuration.name] = configDependencies
-                }
-            } catch (Exception e) {
-                println "Could not resolve dependencies for configuration: ${configuration.name}"
-                println "Error: ${e.message}"
-            }
-        }
-
-        def jsonOutput = new JsonBuilder(rootDependencies).toPrettyString()
-        new File("${buildDir}/dependency-hierarchy.json").write(jsonOutput)
+def parse_gradle_output(input_text):
+    lines = input_text.strip().split("\n")
+    dependencies = {
+        "groupId": "java-gradle-starter-project",
+        "artifactId": "my-app",
+        "version": "1.0-SNAPSHOT",
+        "children": []
     }
-}
+    for i, line in enumerate(lines):
+        if line.startswith("compileClasspath"):
+            dependencies["children"] = parse_dependencies(lines[i + 1:])
+            break
+    return dependencies
 
-def buildDependencyTree(dependency) {
-    def dependencyNode = [
-        group: dependency.moduleGroup,
-        name: dependency.moduleName,
-        version: dependency.moduleVersion,
-        children: []
-    ]
-
-    dependency.children.each { childDependency ->
-        dependencyNode.children << buildDependencyTree(childDependency)
-    }
-
-    return dependencyNode
-}
-"""
-
-
-def append_to_build_gradle(file_path, script):
-    local_gradle_path = os.path.join(file_path, 'build.gradle')
-
-    try:
-        with open(local_gradle_path, "a") as file:
-            file.write("\n" + script.strip() + "\n")
-        print(f"Groovy script successfully appended to {local_gradle_path}")
-    except FileNotFoundError:
-        print(f"Error: {local_gradle_path} not found. Please ensure the file exists.")
-
-
-def run_gradle_task(file_path):
-    print("Running Gradle task to generate dependency-hierarchy.json...")
-    try:
-        os.chdir(file_path)
-        subprocess.run(["./gradlew", "buildDependencyTree"], check=True)
-        print("Gradle task completed successfully!")
-    except subprocess.CalledProcessError:
-        print("Error running Gradle task. Please check your build.gradle file.")
-        exit(1)
-
-
-def find_dependency_json(file_path):
-    json_path = os.path.join(file_path, "dependency-hierarchy.json")
-    if os.path.exists(json_path):
-        print(f"JSON file found at: {json_path}")
-        return json_path
-    else:
-        print("Error: dependency-hierarchy.json not found in build directory.")
-        exit(1)
-
-
-def read_json(json_path):
-    with open(json_path, "r") as file:
-        data = json.load(file)
-        print("\nGenerated Dependency Hierarchy JSON:")
-        print(json.dumps(data, indent=4))
-
-
-def generate_json_from_gradle(project_name, gradle_file, file_path):
-    append_to_build_gradle(file_path, gradle_script)
-    run_gradle_task(file_path)
-    json_path = find_dependency_json(file_path)
-    read_json(json_path)
-    return json_path
+# Parse and convert to JSON
+parsed_dependencies = parse_gradle_output(input_dependencies)
+print(json.dumps(parsed_dependencies, indent=4))
